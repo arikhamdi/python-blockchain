@@ -1,5 +1,7 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from backend.blockchain.blockchain import Blockchain
+from backend.wallet.wallet import Wallet
+from backend.wallet.transaction import Transaction
 from backend.pubsub import PubSub
 
 import requests
@@ -9,6 +11,7 @@ import os
 
 app = Flask(__name__)
 blockchain = Blockchain()
+wallet = Wallet()
 pubsub = PubSub(blockchain)
 
 
@@ -32,6 +35,19 @@ def route_blockchain_mine():
     pubsub.broadcast_block(block)
 
     return jsonify(block.to_json())
+
+
+@app.route('/wallet/transact', methods=['POST'])
+def route_wallet_transact():
+    transaction_data = request.get_json()
+    transaction = Transaction(
+        wallet,
+        transaction_data['recipient'],
+        transaction_data['amount']
+    )
+
+    print(f"transaction.to_json(): {transaction.to_json()}")
+    return jsonify(transaction.to_json())
 
 
 ROOT_PORT = 5000
