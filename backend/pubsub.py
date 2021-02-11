@@ -1,3 +1,4 @@
+from backend.wallet.transaction import Transaction
 from backend.blockchain.block import Block
 import time
 from pubnub.pubnub import PubNub
@@ -12,13 +13,15 @@ pnconfig.publish_key = 'pub-c-a3ad5aae-7455-4cf0-89e6-318ac9c6c262'
 
 CHANNELS = {
     'TEST': 'TEST',
-    'BLOCK': 'BLOCK'
+    'BLOCK': 'BLOCK',
+    'TRANSACTION': 'TRANSACTION'
 }
 
 
 class Listener(SubscribeCallback):
-    def __init__(self, blockchain):
+    def __init__(self, blockchain, transaction_pool):
         self.blockchain = blockchain
+        self.transaction_pool = transaction_pool
 
     def message(self, pubnub, message_object):
         print(
@@ -34,6 +37,10 @@ class Listener(SubscribeCallback):
                 print(f'\n -- Successfully replace the local chain')
             except Exception as e:
                 print(f'\n -- Did not replace chain: {e}')
+        elif message_object.channel == CHANNELS['TRANSACTION']:
+            transaction = Transaction.from_json(message_object.message)
+            self.transaction_pool.set_transaction(transaction)
+            print(f"\n -- Set the new transaction in transaction pool")
 
 
 class PubSub():
@@ -42,10 +49,10 @@ class PubSub():
     Provides communication between the nodes of the blockchain network.
     """
 
-    def __init__(self, blockchain) -> None:
+    def __init__(self, blockchain, transaction_pool) -> None:
         self.pubnub = PubNub(pnconfig)
         self.pubnub.subscribe().channels(CHANNELS.values()).execute()
-        self.pubnub.add_listener(Listener(blockchain))
+        self.pubnub.add_listener(Listener(blockchain, transaction_pool))
 
     def publish(self, channel, message):
         """
@@ -58,6 +65,12 @@ class PubSub():
         Broadcast a block object to all nodes.
         """
         self.publish(CHANNELS['BLOCK'], block.to_json())
+
+    def broadcast_transaction(self, transaction):
+        """
+        Broadcast a transaction to all nodes
+        """
+        self.publish(CHANNELS['TRANSACTION'], transaction.to_json())
 
 
 def main():
